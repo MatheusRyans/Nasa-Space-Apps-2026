@@ -37,6 +37,7 @@ Every threshold is a parameter of the Medical Profile, which the flight medical 
 ```
 src/engine.js   pure classification engine (no DOM)
 src/i18n.js     English (default) and Portuguese
+src/fx.js       visual effects (constellation grid, live ECG trace, dust particles, count-up, scan)
 src/app.js      interface
 src/style.css   styles
 src/body.html   page markup

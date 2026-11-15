@@ -316,13 +316,13 @@
   function simulateSample(mode, t, r) {
     const n = () => r() * 2 - 1;
     if (mode === 'faint') {
-      if (t < 60) return { hr: 64 + n() * 2, motion: 30 + n() * 8, q: 0.95 };
-      const p = Math.min(1, (t - 60) / 20);
+      if (t < 25) return { hr: 64 + n() * 2, motion: 30 + n() * 8, q: 0.95 };
+      const p = Math.min(1, (t - 25) / 20);
       return { hr: 64 - p * 36 + n() * 1, motion: Math.max(0, 30 * (1 - p) + n() * 2), q: 0.95 };
     }
     if (mode === 'sleep') return { hr: 52 + n() * 2, motion: 1 + Math.abs(n()), q: 0.95 };
     if (mode === 'sensor') {
-      if (t < 60) return { hr: 64 + n() * 2, motion: 30 + n() * 8, q: 0.95 };
+      if (t < 20) return { hr: 64 + n() * 2, motion: 30 + n() * 8, q: 0.95 };
       return { hr: null, motion: 0, q: 0.1 };
     }
     return { hr: 64 + n() * 2, motion: 30 + n() * 8, q: 0.95 };

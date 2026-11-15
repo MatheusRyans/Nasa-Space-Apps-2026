@@ -20,7 +20,7 @@
     { id: 'A-04', name: 'E. Lindqvist', scn: 'healthy' }
   ];
   const TABS = ['overview', 'checkin', 'history', 'profile'];
-  const S = { user: 1, tab: 'overview', region: 'chest', ind: 'sono', recs: [], events: [], eid: 0, clock: 30 * 1440 + 480, sim: null, result: null, errors: {}, form: {}, gateMsg: null, demoOpen: false };
+  const S = { user: 1, tab: 'overview', region: 'chest', ind: 'sono', recs: [], events: [], eid: 0, clock: 30 * 1440 + 480, sim: null, result: null, errors: {}, form: {}, gateMsg: null, demoOpen: window.innerWidth > 700, anim: false, scanNext: false, fresh: false };
 
   function mkRec(i, scn) {
     const id = ROSTER[i].id, profile = E.makeProfile(id), h = E.makeHistory(id, scn, profile);
@@ -78,7 +78,7 @@
     const x = i => 2 + i * (w - 4) / (vals.length - 1), y = v => h - 2 - (v - lo) / (hi - lo) * (h - 4);
     let d = '', pen = false, lastI = 0;
     vals.forEach((v, i) => { if (v == null) { pen = false; return; } d += (pen ? 'L' : 'M') + x(i).toFixed(1) + ' ' + y(v).toFixed(1); pen = true; lastI = i; });
-    return '<svg class="sp lv' + lv + '" width="' + w + '" height="' + h + '" viewBox="0 0 ' + w + ' ' + h + '" role="img" aria-label="30-day trend"><rect class="sp-band" x="0" y="' + y(base.mean + sd).toFixed(1) + '" width="' + w + '" height="' + (y(base.mean - sd) - y(base.mean + sd)).toFixed(1) + '"/><path class="sp-line" d="' + d + '"/><circle class="sp-dot" cx="' + x(lastI).toFixed(1) + '" cy="' + y(vals[lastI]).toFixed(1) + '" r="2.6"/></svg>';
+    return '<svg class="sp lv' + lv + '" width="' + w + '" height="' + h + '" viewBox="0 0 ' + w + ' ' + h + '" role="img" aria-label="30-day trend"><rect class="sp-band" x="0" y="' + y(base.mean + sd).toFixed(1) + '" width="' + w + '" height="' + (y(base.mean - sd) - y(base.mean + sd)).toFixed(1) + '"/><path class="sp-line draw" pathLength="1" d="' + d + '"/><circle class="sp-dot" cx="' + x(lastI).toFixed(1) + '" cy="' + y(vals[lastI]).toFixed(1) + '" r="2.6"/></svg>';
   }
   function niceStep(range) { const raw = range / 4, p = Math.pow(10, Math.floor(Math.log10(raw))), f = raw / p; return (f < 1.5 ? 1 : f < 3 ? 2 : f < 7 ? 5 : 10) * p; }
   function bigChart(I, rec) {
@@ -97,7 +97,7 @@
     const dots = vals.map((v, i) => (v != null && i >= n - 3) ? '<circle cx="' + x(i).toFixed(1) + '" cy="' + y(v).toFixed(1) + '" r="3.6" fill="var(--c)"/>' : '').join('');
     let eva = '';
     if (rec.evaDay != null && rec.evaDay >= d0) { const xi = x(rec.evaDay - d0); eva = '<line x1="' + xi.toFixed(1) + '" x2="' + xi.toFixed(1) + '" y1="' + T + '" y2="' + (H - B) + '" stroke="var(--accent)" stroke-dasharray="4 3"/><text class="ax" x="' + (xi - 4).toFixed(1) + '" y="' + (T + 10) + '" text-anchor="end" style="fill:var(--accent)">' + t('hist.eva') + ' D+' + rec.evaDay + '</text>'; }
-    return '<svg class="lv' + d.level + '" viewBox="0 0 ' + W + ' ' + H + '" width="100%" role="img" aria-label="' + esc(t('ind.' + I.k)) + '">' + g + '<rect class="band" x="' + L + '" y="' + y(base.mean + sd).toFixed(1) + '" width="' + (W - L - R) + '" height="' + (y(base.mean - sd) - y(base.mean + sd)).toFixed(1) + '"/>' + eva + '<path class="ln" d="' + path + '"/>' + dots + '</svg>';
+    return '<svg class="lv' + d.level + '" viewBox="0 0 ' + W + ' ' + H + '" width="100%" role="img" aria-label="' + esc(t('ind.' + I.k)) + '">' + g + '<rect class="band" x="' + L + '" y="' + y(base.mean + sd).toFixed(1) + '" width="' + (W - L - R) + '" height="' + (y(base.mean - sd) - y(base.mean + sd)).toFixed(1) + '"/>' + eva + '<path class="ln draw" pathLength="1" d="' + path + '"/>' + dots + '</svg>';
   }
   function emChart(buf, lim) {
     const s = buf.slice(-100), n = s.length;
@@ -187,16 +187,40 @@
     const em = rec.level === 3 && rec.em && rec.em.stage === 'declared';
     const pin = (r, x, y, ax, ay, side) => {
       const lv = regionLevel(rec, r), w = 146;
-      return '<g class="pin lv' + lv + (S.region === r ? ' sel' : '') + '" data-act="region" data-r="' + r + '" tabindex="0" role="button" aria-label="' + esc(t('reg.' + r) + ': ' + t('lv.' + lv)) + '"><path class="link" d="M' + ax + ' ' + ay + ' L' + (side === 'r' ? x : x + w) + ' ' + (y + 22) + '"/><rect x="' + x + '" y="' + y + '" width="' + w + '" height="44" rx="5"/><text class="pn" x="' + (x + 10) + '" y="' + (y + 17) + '">' + esc(t('reg.' + r).toUpperCase()) + '</text><text class="ps" x="' + (x + 10) + '" y="' + (y + 35) + '">' + esc(lv === 3 ? t('lv.s.3') : t('lv.' + lv)) + '</text></g>';
+      return '<g class="pin lv' + lv + (S.region === r ? ' sel' : '') + '" data-act="region" data-r="' + r + '" tabindex="0" role="button" aria-label="' + esc(t('reg.' + r) + ': ' + t('lv.' + lv)) + '"><path class="link" d="M' + ax + ' ' + ay + ' L' + (side === 'r' ? x : x + w) + ' ' + (y + 22) + '"/><circle class="node" cx="' + ax + '" cy="' + ay + '" r="3"/><rect x="' + x + '" y="' + y + '" width="' + w + '" height="44" rx="3"/><text class="pn" x="' + (x + 10) + '" y="' + (y + 17) + '">' + esc(t('reg.' + r).toUpperCase()) + '</text><text class="ps" x="' + (x + 10) + '" y="' + (y + 35) + '">' + esc(lv === 3 ? t('lv.s.3') : t('lv.' + lv)) + '</text></g>';
     };
     const reg = (r, inner) => '<g class="reg lv' + regionLevel(rec, r) + (S.region === r ? ' sel' : '') + (em ? ' em' : '') + '" data-act="region" data-r="' + r + '" tabindex="0" role="button" aria-label="' + esc(t('reg.' + r) + ': ' + t('lv.' + regionLevel(rec, r))) + '">' + inner + '</g>';
-    return '<svg class="map" viewBox="0 0 480 470" role="group" aria-label="' + esc(t('map.title')) + '"><rect class="part" x="198" y="128" width="84" height="118" rx="10"/>' +
-      reg('chest', '<rect class="shape" x="190" y="122" width="100" height="146" rx="24"/><rect x="214" y="150" width="52" height="34" rx="5" fill="rgba(91,155,255,.14)" stroke="var(--line-2)"/><path d="M220 168 h8 l4-9 5 16 4-7 h20" fill="none" stroke="var(--fg)" stroke-width="1.5" opacity=".75"/>') +
+    const rows = (a, b, n) => Array.from({ length: n }, (_, i) => Math.round(a + (b - a) * i / (n - 1)));
+    const sl = (x1, x2, ys) => '<path class="slice" d="' + ys.map(y => 'M' + x1 + ' ' + y + 'H' + x2).join('') + '"/>';
+    const defs = '<defs><linearGradient id="beamg" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#6fe0ee" stop-opacity=".5"/><stop offset="1" stop-color="#6fe0ee" stop-opacity="0"/></linearGradient><linearGradient id="sweepg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#9aeef7" stop-opacity="0"/><stop offset=".5" stop-color="#9aeef7" stop-opacity=".85"/><stop offset="1" stop-color="#9aeef7" stop-opacity="0"/></linearGradient><clipPath id="figclip"><rect x="120" y="10" width="240" height="462"/></clipPath></defs>';
+    const emitter = '<polygon class="beam" points="140,468 340,468 300,10 180,10"/><ellipse class="emit" cx="240" cy="468" rx="140" ry="26"/><ellipse class="emit" cx="240" cy="468" rx="100" ry="19"/><ellipse class="emit" cx="240" cy="468" rx="62" ry="12"/><ellipse class="ring r1" cx="240" cy="468" rx="140" ry="26"/><ellipse class="ring r2" cx="240" cy="468" rx="140" ry="26"/><ellipse class="ring r3" cx="240" cy="468" rx="140" ry="26"/>';
+    const fig = '<g class="fig"><rect class="part" x="198" y="128" width="84" height="118" rx="10"/>' +
+      reg('chest', '<rect class="shape" x="190" y="122" width="100" height="146" rx="24"/>' + sl(196, 284, rows(140, 256, 8)) + '<rect x="214" y="150" width="52" height="34" rx="5" fill="rgba(111,224,238,.10)" stroke="var(--line-2)"/><path d="M220 168 h8 l4-9 5 16 4-7 h20" fill="none" stroke="var(--fg)" stroke-width="1.5" opacity=".8"/>') +
       '<rect class="part" x="190" y="240" width="100" height="10" rx="4"/>' +
-      reg('head', '<rect class="shape" x="220" y="108" width="40" height="14" rx="6"/><circle class="shape" cx="240" cy="70" r="44"/><ellipse cx="240" cy="74" rx="30" ry="24" fill="#070c16" stroke="var(--line-2)"/><path d="M222 66 q10-10 22-8" fill="none" stroke="rgba(255,255,255,.25)" stroke-width="2"/>') +
+      reg('head', '<rect class="shape" x="220" y="108" width="40" height="14" rx="6"/><circle class="shape" cx="240" cy="70" r="44"/><ellipse cx="240" cy="74" rx="30" ry="24" fill="rgba(3,12,20,.85)" stroke="var(--line-2)"/><path d="M222 66 q10-10 22-8" fill="none" stroke="rgba(255,255,255,.3)" stroke-width="2"/>') +
       reg('arms', '<rect class="shape" x="156" y="128" width="34" height="128" rx="17" transform="rotate(8 173 128)"/><rect class="shape" x="290" y="128" width="34" height="128" rx="17" transform="rotate(-8 307 128)"/><circle class="shape" cx="155" cy="266" r="14"/><circle class="shape" cx="325" cy="266" r="14"/>') +
-      reg('legs', '<rect class="shape" x="194" y="266" width="42" height="160" rx="18"/><rect class="shape" x="244" y="266" width="42" height="160" rx="18"/><rect class="shape" x="190" y="420" width="50" height="34" rx="12"/><rect class="shape" x="240" y="420" width="50" height="34" rx="12"/>') +
+      reg('legs', '<rect class="shape" x="194" y="266" width="42" height="160" rx="18"/><rect class="shape" x="244" y="266" width="42" height="160" rx="18"/><rect class="shape" x="190" y="420" width="50" height="34" rx="12"/><rect class="shape" x="240" y="420" width="50" height="34" rx="12"/>' + sl(198, 232, rows(284, 408, 8)) + sl(248, 282, rows(284, 408, 8))) + '</g>';
+    return '<svg class="map" viewBox="0 0 480 500" role="group" aria-label="' + esc(t('map.title')) + '">' + defs + emitter + fig +
+      '<g clip-path="url(#figclip)"><rect class="sweep" x="120" y="0" width="240" height="26" fill="url(#sweepg)"/></g><circle class="heart lv' + regionLevel(rec, 'chest') + '" cx="240" cy="167" r="7"/>' +
       pin('head', 330, 40, 284, 68, 'r') + pin('chest', 4, 150, 190, 170, 'l') + pin('arms', 330, 206, 326, 222, 'r') + pin('legs', 4, 330, 194, 352, 'l') + '</svg>';
+  }
+  function telemetryHtml(rec) {
+    const res = rec.res, d = k => res.inds[k];
+    const simOn = S.sim && S.sim.who === rec.i;
+    const lost = rec.loss || (simOn && S.sim.det && S.sim.det.state === 'sensor');
+    const lvOf = k => res.limits[k] ? (res.limits[k].confirmed && res.limits[k].level === 2 ? 3 : 2) : d(k).level;
+    const sh = simHr(rec);
+    const hr = sh != null ? Math.round(sh) : d('fc').last;
+    const hrLv = (sh != null && sh < rec.profile.limits.fc.low[1]) ? 3 : lvOf('fc');
+    const big = (key, v, dec, unit) => '<div class="big"><span id="live-' + key + '" data-key="' + key + '" data-count="' + (v == null ? 0 : v) + '" data-dec="' + dec + '">' + (v == null ? '—' : fmt(v, dec)) + '</span><small>' + esc(unit) + '</small></div>';
+    const card = (title, lv, inner) => '<div class="card hud lv' + lv + '"><h3 class="hud-title"><i></i>' + esc(title) + '</h3>' + inner + '</div>';
+    const sp = d('spo2').last, fr = d('fr').last, tp = d('temp').last;
+    const clamp = x => Math.max(0, Math.min(1, x));
+    const stream = card(t('tel.title'), hrLv, '<div class="row"><span class="st' + (lost ? ' off' : '') + '">' + esc(lost ? t('tel.nosignal') : t('tel.online')) + ' · ' + esc(t('tel.sim')) + '</span>' + big('hr', lost ? null : hr, 0, 'bpm') + '</div><canvas data-fx="ecg" aria-label="' + esc(t('tel.title')) + '"></canvas><p class="note">' + esc(t('tel.note')) + '</p>');
+    const oxy = card(t('tel.spo2'), lvOf('spo2'), big('spo2', sp, 0, '%') + '<div class="gauge" aria-hidden="true"><i style="transform:scaleX(' + clamp(((sp == null ? 97 : sp) - 80) / 20).toFixed(2) + ')"></i></div>');
+    const resp = card(t('tel.resp'), lvOf('fr'), big('fr', fr, 0, 'rpm') + '<div class="breath" aria-hidden="true"></div>');
+    const temp = card(t('tel.temp'), lvOf('temp'), big('temp', tp, 1, '°C') + '<div class="gauge" aria-hidden="true"><i style="transform:scaleX(' + clamp(((tp == null ? 36.6 : tp) - 35) / 5).toFixed(2) + ')"></i></div>');
+    return '<section class="tele" aria-label="' + esc(t('tel.title')) + '">' + stream + oxy + resp + temp + '</section>';
   }
   function irow(I, rec) {
     const d = rec.res.inds[I.k], lim = rec.res.limits[I.k];
@@ -224,14 +248,19 @@
   /* ---------- overview ---------- */
   function simPanel(rec) {
     const sim = S.sim;
-    if (!sim || sim.who !== rec.i) return '';
-    const st = sim.det && sim.det.state;
+    if (!sim || sim.who !== rec.i || (rec.em && rec.em.stage === 'declared')) return '';
+    const st = sim.det && sim.det.state, last = sim.buf[sim.buf.length - 1] || {};
+    const lim = rec.profile.limits.fc.low[1];
+    const cl = x => Math.max(0, Math.min(1, x)).toFixed(3);
+    const meter = (lbl, id, val, unit, f, extra) => '<div class="m"><span>' + esc(lbl) + '</span><div><b id="sl-' + id + '">' + val + '</b><small>' + esc(unit) + '</small></div><div class="gauge" aria-hidden="true"><i id="sl-' + id + '-b" style="transform:scaleX(' + cl(f) + ')"></i></div>' + (extra || '') + '</div>';
+    const live = '<div class="meters">' + meter(t('sim.hr'), 'hr', last.hr == null ? '—' : Math.round(last.hr), 'bpm', last.hr == null ? 0 : (last.hr - 20) / 100, '<em>' + esc(t('sim.limit', { n: lim })) + '</em>') + meter(t('sim.motion'), 'mo', Math.round(last.motion || 0), '', (last.motion || 0) / 60) + meter(t('sim.quality'), 'q', Math.round((last.q || 0) * 100), '%', last.q || 0) + '</div><p class="detstate" id="sl-state">' + esc(t('sim.state.' + st)) + '</p>';
     let msg = '';
-    if (rec.em && rec.em.stage === 'suspect') msg = '<h3>' + esc(t('em.suspect')) + '</h3><p>' + esc(t('em.suspect.desc')) + '</p>';
-    else if (rec.em && rec.em.stage === 'confirm') msg = '<h3>' + esc(t('em.confirm')) + '</h3><p>' + esc(t('em.confirm.desc', { n: rec.em.cd })) + '</p><p><span class="countdown">' + rec.em.cd + '</span></p><p><button class="btn primary" data-act="ack">' + esc(t('em.respond')) + '</button></p>';
+    if (rec.em && rec.em.stage === 'suspect') msg = stepsHtml(rec) + '<h3>' + esc(t('em.suspect')) + '</h3><p>' + esc(t('em.suspect.desc')) + '</p>';
+    else if (rec.em && rec.em.stage === 'confirm') msg = stepsHtml(rec) + '<div class="confirm"><div class="timer"><svg viewBox="0 0 120 120" aria-hidden="true"><circle class="tr" cx="60" cy="60" r="52"/><circle class="tp" id="cd-ring" cx="60" cy="60" r="52" pathLength="1" style="stroke-dashoffset:' + (1 - rec.em.cd / 8).toFixed(3) + '"/></svg><div class="num" id="cd-num">' + rec.em.cd + '</div></div><div><h3>' + esc(t('em.confirm')) + '</h3><p>' + esc(t('em.confirm.desc', { n: 8 })) + '</p><p><button class="btn primary" data-act="ack">' + esc(t('em.respond')) + '</button></p></div></div>';
     else if (st === 'sensor') msg = '<h3>' + esc(t('em.sensor')) + '</h3><p>' + esc(t('em.sensor.desc')) + '</p>';
     else if (st === 'sleep') msg = '<h3>' + esc(t('em.sleep')) + '</h3><p>' + esc(t('em.sleep.desc')) + '</p>';
-    return '<div class="result lv' + (rec.em ? 1 : 0) + '" role="status">' + msg + '<div>' + emChart(sim.buf, rec.profile.limits.fc.low[1]) + '</div><p class="note" style="margin-top:0">' + esc(t('em.note')) + '</p></div>';
+    const lv = rec.em ? (rec.em.stage === 'confirm' ? 2 : 1) : 0;
+    return '<div class="result simlive lv' + lv + '" role="status"><h3>' + esc(t('sim.run.' + sim.mode)) + '</h3>' + live + msg + '<p><button class="btn" data-act="simstop">' + esc(t('sim.stop')) + '</button></p><p class="note" style="margin-top:0">' + esc(t('em.note')) + '</p></div>';
   }
   function stepsHtml(rec) {
     const stage = rec.em ? rec.em.stage : null, order = { suspect: 0, confirm: 1, declared: 2 }, c = order[stage];
@@ -251,14 +280,13 @@
   function renderOverview(rec) {
     const lv = rec.level, ex = explain(rec), res = rec.res, em = rec.em;
     const done = checkedToday(rec);
-    let state = '';
+    let state = simPanel(rec);
     const heroAct = t('lv.act.' + lv);
-    state += '<div class="hero lv' + lv + '"><div class="lvl">' + icon(lv) + '<span>' + esc(t('lv.' + lv)) + '</span></div><div class="msg">' + esc(headline(rec)) + '</div><div class="act">' + esc(heroAct) + '</div><div class="meta"><span>' + esc(done ? t('ov.done', { day: rec.today }) : t('ov.last', { day: res.maxDay })) + '</span><span>' + esc(t('ov.trend')) + ': ' + esc(t('trend.' + res.trend)) + '</span>' + (ex.p && lv < 3 ? '<span>' + esc(t('q.conf')) + ': ' + esc(t('conf.' + ex.p.conf)) + '</span>' : '') + '</div></div>';
+    state += '<div class="hero lv' + lv + (S.fresh ? ' fresh' : '') + '"><div class="lvl">' + icon(lv) + '<span>' + esc(t('lv.' + lv)) + '</span></div><div class="msg">' + esc(headline(rec)) + '</div><div class="act">' + esc(heroAct) + '</div><div class="meta"><span>' + esc(done ? t('ov.done', { day: rec.today }) : t('ov.last', { day: res.maxDay })) + '</span><span>' + esc(t('ov.trend')) + ': ' + esc(t('trend.' + res.trend)) + '</span>' + (ex.p && lv < 3 ? '<span>' + esc(t('q.conf')) + ': ' + esc(t('conf.' + ex.p.conf)) + '</span>' : '') + '</div></div>';
     if (!done) state += '<p class="note pending"><span>' + esc(t('ov.pending')) + '</span><button class="btn primary" data-act="tab" data-tab="checkin">' + esc(t('ov.pendingBtn')) + '</button></p>';
     if (res.adapting) state += '<p class="note">' + esc(t('ov.adapting', { days: rec.profile.tolerances.adaptationDays })) + '</p>';
     if (res.insufficient) state += '<p class="note" role="status">' + esc(t('ov.insufficient')) + '</p>';
     if (em && em.stage === 'declared') state += stepsHtml(rec) + '<div class="chartbox"><h3>' + esc(t('em.chart.title')) + '</h3><p class="sub">' + esc(t('em.chart.sub')) + '</p>' + emChart(em.buf, rec.profile.limits.fc.low[1]) + '</div><p><button class="btn" data-act="alertopen">' + esc(t('em.view')) + '</button> <button class="btn danger" data-act="endinc">' + esc(t('em.end')) + '</button></p>';
-    state += simPanel(rec);
     const qs = [['1', '<ul>' + ex.what.map(w => '<li>' + esc(w) + '</li>').join('') + '</ul>', true],
       ['2', '<p>' + esc(ex.why) + '</p>' + (ex.hz.length ? '<div class="hz">' + esc(t('hz.note')) + ': ' + ex.hz.map(h => '<span class="tag">' + esc(t('hz.' + h)) + '</span>').join('') + '</div>' : ''), false],
       ['3', '<div class="tscroll"><table><thead><tr><th>' + esc(t('q.ev.ind')) + '</th><th>' + esc(t('q.ev.base')) + '</th><th>' + esc(t('q.ev.now')) + '</th><th>' + esc(t('q.ev.dev')) + '</th><th>' + esc(t('q.ev.days')) + '</th><th>' + esc(t('q.ev.lv')) + '</th></tr></thead><tbody>' + ex.rows.join('') + '</tbody></table></div><p class="disc">' + esc(t('q.ev.note')) + '</p>', false],
@@ -269,9 +297,11 @@
     state += '<p class="note">' + (low.length ? esc(t('ov.capacity.low', { list: low.map(c => t('cap.' + c.k)).join(', ') })) + ' ' + esc(t('ov.capacity.action')) : esc(t('ov.capacity.ok'))) + '</p>';
     state += gateHtml(rec);
     state += '<details class="q" style="margin-top:14px"><summary>' + esc(t('how.title')) + '</summary><div class="body"><ol>' + [1, 2, 3, 4, 5].map(n => '<li>' + esc(t('how.' + n)) + '</li>').join('') + '</ol><p class="disc">' + esc(t('how.note')) + '</p></div></details>';
-    const map = '<h2>' + esc(t('map.title')) + ' · ' + esc(rec.name) + '</h2><p class="sub">' + esc(t('map.hint')) + '</p>' + bodyMap(rec) +
-      '<div class="whole lv' + lv + '"><button data-act="region" data-r="general" aria-pressed="' + (S.region === 'general') + '">' + esc(t('reg.general')) + pill(lv) + '</button></div><div class="region" id="regionPanel">' + regionPanel(rec) + '</div>';
-    return '<div class="grid"><section class="pane state-pane" aria-label="' + esc(t('ov.title')) + '"><h2>' + esc(t('ov.title')) + ' · ' + esc(t('ov.today', { day: rec.today })) + '</h2>' + state + '</section><section class="pane map-pane">' + map + '</section></div>';
+    const emDone = rec.em && rec.em.stage === 'declared';
+    const dustOn = FX.src.dust() > 0.05;
+    const map = '<div class="stage hud' + (emDone ? ' em' : '') + '"><h2 class="hud-title"><i></i>' + esc(t('map.title')) + ' · ' + esc(rec.name) + '</h2><p class="hint">' + esc(t('map.hint')) + (dustOn ? ' ' + esc(t('dust.note')) : '') + '</p><div class="holo">' + bodyMap(rec) + '<canvas class="dust" data-fx="dust" aria-hidden="true"></canvas></div>' +
+      '<div class="whole lv' + lv + '"><button data-act="region" data-r="general" aria-pressed="' + (S.region === 'general') + '">' + esc(t('reg.general')) + pill(lv) + '</button></div></div><div class="region" id="regionPanel">' + regionPanel(rec) + '</div>';
+    return telemetryHtml(rec) + '<div class="grid"><section class="pane state-pane" aria-label="' + esc(t('ov.title')) + '"><h2>' + esc(t('ov.title')) + ' · ' + esc(t('ov.today', { day: rec.today })) + '</h2>' + state + '</section><section class="pane map-pane">' + map + '</section></div>';
   }
 
   /* ---------- check-in ---------- */
@@ -341,6 +371,7 @@
     $('#lbl-lang').textContent = t('lang.label');
     $('#sub').textContent = t('app.sub');
     $('#sim').textContent = t('badge.sim');
+    const fb = $('#fxbtn'); if (fb) { fb.textContent = t('fx.label') + ': ' + t(FX.enabled ? 'fx.on' : 'fx.off'); fb.setAttribute('aria-pressed', String(FX.enabled)); }
     document.documentElement.lang = lang === 'pt' ? 'pt-BR' : 'en';
     document.querySelectorAll('#lang button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.lang === lang)));
     $('#tabs').innerHTML = TABS.map(k => '<button role="tab" id="tab-' + k + '" aria-selected="' + (S.tab === k) + '" data-act="tab" data-tab="' + k + '">' + esc(t('nav.' + k)) + '</button>').join('');
@@ -348,7 +379,8 @@
   }
   function renderDemo() {
     const open = S.demoOpen ? ' open' : '';
-    $('#demo').innerHTML = '<details class="demo"' + open + ' id="demod"><summary>' + esc(t('demo.title')) + '</summary><div class="demo-body"><p>' + esc(t('demo.note')) + '</p><div class="grp"><label>' + esc(t('demo.scenario')) + '<select id="scnsel">' + ['healthy', 'trend', 'high', 'dust', 'acute'].map(s => '<option value="' + s + '">' + esc(t('demo.sc.' + s)) + '</option>').join('') + '</select></label><button class="btn" data-act="scn">' + esc(t('demo.apply')) + '</button></div><div class="grp"><button class="btn" data-act="nextday">' + esc(t('demo.nextday')) + '</button></div><div class="grp"><button class="btn danger" data-act="sim" data-mode="faint">' + esc(t('demo.faint')) + '</button><button class="btn" data-act="sim" data-mode="sleep">' + esc(t('demo.sleep')) + '</button><button class="btn" data-act="sim" data-mode="sensor">' + esc(t('demo.sensor')) + '</button></div><div class="grp"><button class="btn" data-act="reset">' + esc(t('demo.reset')) + '</button></div></div></details>';
+    const sc = ['healthy', 'trend', 'high', 'dust', 'acute'].map(s => '<button class="btn" data-act="scn" data-sc="' + s + '">' + esc(t('demo.sc.' + s)) + '</button>').join('');
+    $('#demo').innerHTML = '<details class="demo dock"' + open + ' id="demod"><summary title="' + esc(t('demo.note')) + '">' + esc(t('demo.title')) + '</summary><div class="demo-body"><div class="grp"><span class="gl">' + esc(t('demo.scenario')) + '</span>' + sc + '</div><div class="grp"><span class="gl">' + esc(t('demo.sim')) + '</span><button class="btn danger" data-act="sim" data-mode="faint">' + esc(t('demo.faint')) + '</button><button class="btn" data-act="sim" data-mode="sleep">' + esc(t('demo.sleep')) + '</button><button class="btn" data-act="sim" data-mode="sensor">' + esc(t('demo.sensor')) + '</button></div><div class="grp"><button class="btn" data-act="nextday">' + esc(t('demo.nextday')) + '</button><button class="btn" data-act="reset">' + esc(t('demo.reset')) + '</button></div><p>' + esc(t('demo.note')) + '</p></div></details>';
     const d = $('#demod'); if (d) d.addEventListener('toggle', () => { S.demoOpen = d.open; });
   }
   function renderBanner() {
@@ -371,7 +403,12 @@
     renderTop(); renderBanner();
     const rec = cur(), m = $('#main');
     m.setAttribute('role', 'tabpanel'); m.setAttribute('aria-labelledby', 'tab-' + S.tab);
+    m.className = S.anim ? 'anim' : '';
     m.innerHTML = S.tab === 'overview' ? renderOverview(rec) : S.tab === 'checkin' ? renderCheckin(rec) : S.tab === 'history' ? renderHistory(rec) : renderProfile(rec);
+    FX.countUp(m);
+    applyVars();
+    if (S.scanNext && document.querySelector('.stage')) { FX.scan(); S.scanNext = false; }
+    S.anim = false; S.fresh = false;
   }
 
   /* ---------- crew alert dialog ---------- */
@@ -382,7 +419,7 @@
     const trend = dev.slice(0, 3).map(i => t('ind.' + i.k + '.s') + ' ' + sgn(res.inds[i.k].dev) + (i.kind === 'ord' ? '' : 'σ')).join(' · ') || '—';
     const hr = Math.round(rec.em.hrLast);
     const dlg = $('#crew');
-    dlg.innerHTML = '<h2 id="crew-title">' + esc(t('em.declared')) + '</h2><p class="muted" style="margin:6px 0 0">' + esc(t('em.alert.title')) + '</p><dl class="kv"><dt>' + esc(t('em.f.name')) + '</dt><dd><b>' + esc(rec.name) + '</b> (' + rec.id + ')</dd><dt>' + esc(t('em.f.time')) + '</dt><dd>' + esc(tstr(rec.em.t0)) + '</dd><dt>' + esc(t('em.f.status')) + '</dt><dd>' + esc(t('lv.3')) + ' · ' + esc(t('em.p1')) + '</dd><dt>' + esc(t('em.f.critical')) + '</dt><dd>' + esc(t('em.crit.val', { hr })) + '</dd><dt>' + esc(t('em.f.trend')) + '</dt><dd>' + esc(trend) + '</dd></dl><b>' + esc(t('em.f.actions')) + '</b><ul>' + t('em.actions').map(a => '<li>' + esc(a) + '</li>').join('') + '</ul><details><summary>' + esc(t('em.ground')) + '</summary><dl class="kv"><dt>' + esc(t('em.g.id')) + '</dt><dd>' + rec.id + ' · ' + esc(rec.name) + '</dd><dt>' + esc(t('em.g.signs')) + '</dt><dd>' + esc(t('em.crit.val', { hr })) + '</dd><dt>' + esc(t('em.g.hist')) + '</dt><dd>' + esc(t('em.g.histv')) + '</dd><dt>' + esc(t('em.g.evo')) + '</dt><dd>' + esc(t('em.g.evov')) + '</dd><dt>' + esc(t('em.g.state')) + '</dt><dd>' + esc(t('lv.3')) + '</dd><dt>' + esc(t('em.g.why')) + '</dt><dd>' + esc(t('em.g.whyv')) + '</dd><dt>' + esc(t('em.g.risk')) + '</dt><dd>' + esc(trend) + '</dd></dl><p class="muted">' + esc(t('em.g.queue')) + '</p></details><p class="muted" style="font-size:var(--t-sm)">' + esc(t('em.privacy')) + ' ' + esc(t('em.note')) + '</p><p><button class="btn primary" data-act="alertclose" id="crew-close">' + esc(t('em.close')) + '</button></p>';
+    dlg.innerHTML = '<h2 id="crew-title">' + esc(t('em.declared')) + '</h2><p class="muted" style="margin:6px 0 0">' + esc(t('em.alert.title')) + '</p><dl class="kv"><dt>' + esc(t('em.f.name')) + '</dt><dd><b>' + esc(rec.name) + '</b> (' + rec.id + ')</dd><dt>' + esc(t('em.f.time')) + '</dt><dd>' + esc(tstr(rec.em.t0)) + '</dd><dt>' + esc(t('em.f.status')) + '</dt><dd>' + esc(t('lv.3')) + ' · ' + esc(t('em.p1')) + '</dd><dt>' + esc(t('em.f.critical')) + '</dt><dd>' + esc(t('em.crit.val', { hr })) + '</dd><dt>' + esc(t('em.f.trend')) + '</dt><dd>' + esc(trend) + '</dd></dl><b>' + esc(t('em.f.actions')) + '</b><ul>' + t('em.actions').map(a => '<li>' + esc(a) + '</li>').join('') + '</ul><details><summary>' + esc(t('em.ground')) + '</summary><dl class="kv"><dt>' + esc(t('em.g.id')) + '</dt><dd>' + rec.id + ' · ' + esc(rec.name) + '</dd><dt>' + esc(t('em.g.signs')) + '</dt><dd>' + esc(t('em.crit.val', { hr })) + '</dd><dt>' + esc(t('em.g.hist')) + '</dt><dd>' + esc(t('em.g.histv')) + '</dd><dt>' + esc(t('em.g.evo')) + '</dt><dd>' + esc(t('em.g.evov')) + '</dd><dt>' + esc(t('em.g.state')) + '</dt><dd>' + esc(t('lv.3')) + '</dd><dt>' + esc(t('em.g.why')) + '</dt><dd>' + esc(t('em.g.whyv')) + '</dd><dt>' + esc(t('em.g.risk')) + '</dt><dd>' + esc(trend) + '</dd></dl><p class="muted">' + esc(t('em.g.queue')) + '</p></details><p class="muted" style="font-size:var(--t-sm)">' + esc(t('em.privacy')) + ' ' + esc(t('em.note')) + '</p><p><button class="btn primary" data-act="alertclose" id="crew-close">' + esc(t('em.close')) + '</button> <button class="btn" data-act="viewpatient">' + esc(t('em.viewPatient')) + '</button></p>';
     if (!dlg.open && dlg.showModal) { try { dlg.showModal(); } catch (e) { dlg.setAttribute('open', ''); } }
     const c = $('#crew-close'); if (c) c.focus();
   }
@@ -394,41 +431,68 @@
     stopSim();
     const rec = cur(); rec.em = null; rec.loss = false;
     const r = E.rng(7);
-    S.sim = { mode, who: rec.i, t: 0, buf: [], det: { state: 'ok' }, r, timer: null, cdTimer: null, holdSuspect: 0 };
+    const sim = S.sim = { mode, who: rec.i, t: 0, buf: [], det: { state: 'ok' }, r, timer: null, cdTimer: null, holdSuspect: 0, hr: null, lastDet: 'ok' };
+    for (let k = 0; k < 20; k++) { const s = E.simulateSample(mode, sim.t++, r); sim.buf.push(s); if (s.hr != null) sim.hr = s.hr; }
     rec.sleeping = mode === 'sleep';
-    S.sim.timer = setInterval(tick, 120);
-    S.tab = 'overview'; recompute(rec); render();
+    sim.det = E.detectIncapacitation(sim.buf, { limits: rec.profile.limits, sleeping: rec.sleeping });
+    sim.lastDet = sim.det.state;
+    sim.timer = setInterval(tick, 100);
+    S.tab = 'overview'; S.scanNext = true; S.fresh = true; S.anim = true; S.demoOpen = false;
+    recompute(rec); renderDemo(); render(); window.scrollTo(0, 0);
+    toast(t('toast.sim'), mode === 'faint' ? 1 : null);
+  }
+  function stopSimUser() {
+    const sim = S.sim; if (!sim) return;
+    const rec = S.recs[sim.who];
+    stopSim();
+    if (rec.em && rec.em.stage !== 'declared') rec.em = null;
+    rec.loss = false; recompute(rec); render(); toast(t('toast.stop'));
+  }
+  function liveUpdate() {
+    const sim = S.sim;
+    if (!sim || sim.who !== S.user) return;
+    const last = sim.buf[sim.buf.length - 1] || {};
+    const set = (id, txt) => { const n = $('#' + id); if (n) n.textContent = txt; };
+    const bar = (id, f) => { const n = $('#' + id); if (n) n.style.transform = 'scaleX(' + Math.max(0, Math.min(1, f)).toFixed(3) + ')'; };
+    if (sim.hr != null) set('live-hr', Math.round(sim.hr));
+    set('sl-hr', last.hr == null ? '—' : Math.round(last.hr)); bar('sl-hr-b', last.hr == null ? 0 : (last.hr - 20) / 100);
+    set('sl-mo', Math.round(last.motion || 0)); bar('sl-mo-b', (last.motion || 0) / 60);
+    set('sl-q', Math.round((last.q || 0) * 100)); bar('sl-q-b', last.q || 0);
+    const st = $('#sl-state'); if (st) st.textContent = t('sim.state.' + sim.det.state);
   }
   function tick() {
     const sim = S.sim; if (!sim) return;
     const rec = S.recs[sim.who];
     const sample = E.simulateSample(sim.mode, sim.t++, sim.r);
     sim.buf.push(sample); if (sim.buf.length > 300) sim.buf.shift();
+    if (sample.hr != null) sim.hr = sim.hr == null ? sample.hr : sim.hr + (sample.hr - sim.hr) * 0.25;
     sim.det = E.detectIncapacitation(sim.buf, { limits: rec.profile.limits, sleeping: rec.sleeping });
+    let changed = false;
     const wasLoss = rec.loss;
     rec.loss = sim.det.state === 'sensor';
-    if (rec.loss && !wasLoss) addEv(rec.i, 0, 'evt.sensor');
-    if (!rec.loss && wasLoss) addEv(rec.i, 0, 'evt.sensorBack');
+    if (rec.loss !== wasLoss) { addEv(rec.i, 0, rec.loss ? 'evt.sensor' : 'evt.sensorBack'); changed = true; }
     if (!rec.em && sim.det.state === 'suspect') {
       rec.em = { stage: 'suspect', cd: 8, buf: [], t0: S.clock, hrLast: sample.hr };
       addEv(rec.i, 1, 'evt.suspect');
-      sim.holdSuspect = sim.t;
+      sim.holdSuspect = sim.t; changed = true;
     } else if (rec.em && rec.em.stage === 'suspect' && sim.t - sim.holdSuspect > 10) {
       rec.em.stage = 'confirm';
-      sim.cdTimer = setInterval(countdown, 1000);
+      sim.cdTimer = setInterval(countdown, 1000); changed = true;
     }
-    if (rec.em) rec.em.hrLast = sample.hr != null ? sample.hr : rec.em.hrLast;
-    if (S.user === rec.i && S.tab === 'overview' && (!rec.em || rec.em.stage !== 'confirm')) { render(); }
-    else if (S.user === rec.i && S.tab === 'overview' && rec.em && rec.em.stage === 'confirm') { /* the countdown redraws */ }
-    if (sim.mode === 'faint' && !rec.em && sim.t > 130) { clearInterval(sim.timer); }
+    if (rec.em && sample.hr != null) rec.em.hrLast = sample.hr;
+    if (sim.det.state !== sim.lastDet) { sim.lastDet = sim.det.state; changed = true; }
+    if (changed && S.user === rec.i) render(); else liveUpdate();
+    if (sim.mode === 'faint' && !rec.em && sim.t > 130) clearInterval(sim.timer);
   }
   function countdown() {
     const sim = S.sim; if (!sim) return;
     const rec = S.recs[sim.who];
     if (!rec.em || rec.em.stage !== 'confirm') { clearInterval(sim.cdTimer); return; }
     rec.em.cd--;
-    if (rec.em.cd <= 0) { clearInterval(sim.cdTimer); clearInterval(sim.timer); declare(rec); }
-    else render();
+    if (rec.em.cd <= 0) { clearInterval(sim.cdTimer); clearInterval(sim.timer); declare(rec); return; }
+    const n = $('#cd-num'); if (n) n.textContent = rec.em.cd;
+    const r = $('#cd-ring'); if (r) r.style.strokeDashoffset = (1 - rec.em.cd / 8).toFixed(3);
+    renderBanner();
   }
   function declare(rec) {
     S.clock += 4;
@@ -444,7 +508,7 @@
     clearInterval(sim && sim.cdTimer);
     rec.em = null; addEv(rec.i, 0, 'evt.ok');
     if (sim) { clearInterval(sim.timer); S.sim = null; }
-    recompute(rec); render();
+    recompute(rec); render(); toast(t('toast.ack'), 0);
   }
 
   /* ---------- actions ---------- */
@@ -460,14 +524,23 @@
     S.clock += 7;
     addEv(rec.i, 0, 'evt.checkin', { day: rec.today });
     recompute(rec); logChange(rec, prev);
-    S.form = {}; S.errors = {}; S.result = { who: rec.i };
+    S.form = {}; S.errors = {}; S.result = { who: rec.i }; S.fresh = true; S.scanNext = true;
     render();
     const r = $('#ci-result'); if (r) r.focus();
     live(t('ci.saved') + ' ' + t('lv.' + rec.level));
   }
   function live(text) { const l = $('#live'); if (l) l.textContent = text; }
-  function loadScenario() {
-    const sc = $('#scnsel').value, i = S.user;
+  let toastTimer = null;
+  function toast(text, lv, ms) {
+    const el = $('#toast'); if (!el) return;
+    el.className = 'toast show' + (lv == null ? '' : ' lv' + lv);
+    el.textContent = text;
+    live(text);
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { el.className = 'toast'; }, ms || 3600);
+  }
+  function loadScenario(sc) {
+    const i = S.user;
     stopSim();
     const prevLevel = S.recs[i].level;
     const rec = mkRec(i, sc); S.recs[i] = rec;
@@ -476,14 +549,18 @@
     rec.res.pats.forEach(p => addEv(i, p.level, 'evt.pattern', { pattern: p.id, conf: p.conf }));
     Object.keys(rec.res.limits).forEach(k => addEv(i, 2, 'evt.limit', { ind: k }));
     S.result = null; S.form = {}; S.errors = {};
-    closeAlert(); render();
+    S.tab = 'overview'; S.anim = true; S.scanNext = true; S.fresh = true;
+    closeAlert(); render(); window.scrollTo(0, 0);
+    toast(t('toast.scenario', { scenario: t('demo.sc.' + sc) }) + ' · ' + t('lv.' + rec.level), rec.level);
   }
   function nextDay() {
     const rec = cur();
     if (rec.em && rec.em.stage === 'declared') return;
     rec.today++; rec.fresh = false; S.clock = rec.today * 1440 + 480;
     addEv(rec.i, 0, 'evt.day', { day: rec.today });
-    S.result = null; recompute(rec); render();
+    S.result = null; S.tab = 'overview'; S.scanNext = true; S.fresh = true; S.anim = true;
+    recompute(rec); render(); window.scrollTo(0, 0);
+    toast(t('toast.day', { day: rec.today }), 1);
   }
   function init() {
     stopSim();
@@ -491,24 +568,28 @@
     S.events = []; S.eid = 0; S.clock = 30 * 1440 + 480; S.user = 1; S.tab = 'overview'; S.region = 'chest'; S.result = null; S.form = {}; S.errors = {}; S.gateMsg = null;
     S.recs.forEach(rec => { rec.res.pats.forEach(p => addEv(rec.i, p.level, 'evt.pattern', { pattern: p.id, conf: p.conf })); });
     closeAlert(); renderDemo(); render();
+    if (FX.reduceSys && !S.noted) { S.noted = true; toast(t('toast.reduce'), null, 9000); }
   }
 
   document.addEventListener('click', e => {
     const el = e.target.closest('[data-act]'); if (!el) return;
     const a = el.dataset.act;
-    if (a === 'tab') { S.tab = el.dataset.tab; S.gateMsg = null; if (location.hash !== '#' + S.tab) { try { history.replaceState(null, '', '#' + S.tab); } catch (x) { /* ignore */ } } render(); window.scrollTo(0, 0); }
+    if (a === 'tab') { S.tab = el.dataset.tab; S.gateMsg = null; S.anim = true; if (location.hash !== '#' + S.tab) { try { history.replaceState(null, '', '#' + S.tab); } catch (x) { /* ignore */ } } render(); window.scrollTo(0, 0); }
     else if (a === 'region') { S.region = el.dataset.r; render(); }
-    else if (a === 'ind') { S.ind = el.dataset.k; render(); }
-    else if (a === 'scn') loadScenario();
+    else if (a === 'ind') { S.ind = el.dataset.k; S.anim = true; render(); }
+    else if (a === 'scn') loadScenario(el.dataset.sc);
     else if (a === 'nextday') nextDay();
-    else if (a === 'reset') init();
+    else if (a === 'reset') { init(); S.scanNext = true; S.fresh = true; S.anim = true; render(); window.scrollTo(0, 0); toast(t('toast.reset')); }
     else if (a === 'sim') startSim(el.dataset.mode);
     else if (a === 'ack') ackSim();
+    else if (a === 'simstop') stopSimUser();
+    else if (a === 'viewpatient') { const rec = S.recs.find(r => r.em && r.em.stage === 'declared'); if (rec) { S.user = rec.i; S.anim = true; S.scanNext = true; closeAlert(); render(); window.scrollTo(0, 0); } }
     else if (a === 'alertopen') openAlert();
     else if (a === 'alertclose') closeAlert();
     else if (a === 'endinc') { const rec = S.recs.find(r => r.em && r.em.stage === 'declared'); if (rec) { addEv(rec.i, 0, 'evt.end', {}, true); rec.em = null; stopSim(); recompute(rec); closeAlert(); render(); } }
     else if (a === 'evastart') { const rec = cur(); if (!rec.fresh) { S.gateMsg = true; render(); return; } rec.evaOn = true; rec.evaDay = rec.today; rec.fresh = false; S.gateMsg = null; addEv(rec.i, 0, 'evt.eva'); recompute(rec); render(); }
     else if (a === 'evaend') { const rec = cur(); rec.evaOn = false; addEv(rec.i, 0, 'evt.evaEnd'); render(); }
+    else if (a === 'fx') { FX.set(!FX.enabled); render(); }
     else if (a === 'lang') { lang = el.dataset.lang; try { localStorage.setItem('ainh-lang', lang); } catch (x) { /* ignore */ } renderDemo(); render(); }
   });
   document.addEventListener('keydown', e => {
@@ -516,13 +597,40 @@
   });
   document.addEventListener('change', e => {
     const el = e.target;
-    if (el.id === 'viewas') { stopSim(); S.user = +el.value; S.result = null; S.form = {}; S.errors = {}; S.gateMsg = null; render(); }
+    if (el.id === 'viewas') { stopSim(); S.user = +el.value; S.anim = true; S.scanNext = true; S.result = null; S.form = {}; S.errors = {}; S.gateMsg = null; render(); }
     else if (el.dataset && el.dataset.bind) { S.form[el.dataset.bind] = el.value; }
     else if (el.id === 'indsel') { S.ind = el.value; render(); }
   });
   document.addEventListener('input', e => { const el = e.target; if (el.dataset && el.dataset.bind) S.form[el.dataset.bind] = el.value; });
   document.addEventListener('submit', e => { if (e.target.id === 'ciform') { e.preventDefault(); submitCheckin(); } });
   window.addEventListener('hashchange', () => { const h = location.hash.replace('#', ''); if (TABS.indexOf(h) >= 0 && h !== S.tab) { S.tab = h; render(); } });
+
+  /* ---------- link the effects engine to the app state ---------- */
+  const LVC = ['#6fe0ee', '#ecca4a', '#f79a3a', '#ff5d52'];
+  function simHr(rec) {
+    if (S.sim && S.sim.who === rec.i && S.sim.hr != null) return S.sim.hr;
+    if (rec.em && rec.em.stage === 'declared' && rec.em.hrLast != null) return rec.em.hrLast;
+    return null;
+  }
+  FX.fmt = fmt;
+  FX.src.bpm = () => { const rec = cur(); if (!rec) return 62; const s = simHr(rec); if (s != null) return s; const f = rec.res.inds.fc.last; return f == null ? 62 : f; };
+  FX.src.amp = () => { const b = FX.src.bpm(); return b < 40 ? 0.45 : 1; };
+  FX.src.lost = () => { const rec = cur(); return !!(rec && (rec.loss || (S.sim && S.sim.who === rec.i && S.sim.det && S.sim.det.state === 'sensor'))); };
+  FX.src.color = () => { const rec = cur(); return rec ? LVC[rec.level] : LVC[0]; };
+  FX.src.dust = () => {
+    const rec = cur(); if (!rec) return 0;
+    let d = rec.env === 'moon' ? 0.18 : 0;
+    const m = Math.max(0, ...['sym_olho', 'sym_tosse', 'sym_pele'].map(k => rec.res.inds[k].dev || 0));
+    d += Math.min(0.7, m / 2 * 0.7);
+    if (rec.evaOn) d += 0.1;
+    return Math.min(1, d);
+  };
+  function applyVars() {
+    const rec = cur(); if (!rec) return;
+    const bpm = Math.max(30, FX.src.bpm()), fr = rec.res.inds.fr.last || 14;
+    document.documentElement.style.setProperty('--beat', (60 / bpm).toFixed(2) + 's');
+    document.documentElement.style.setProperty('--breath', (60 / Math.max(6, fr)).toFixed(2) + 's');
+  }
 
   const h0 = location.hash.replace('#', ''); if (TABS.indexOf(h0) >= 0) S.tab = h0;
   init();

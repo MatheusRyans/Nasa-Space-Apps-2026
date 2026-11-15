@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 const root = dirname(fileURLToPath(import.meta.url));
 const read = f => readFileSync(join(root, 'src', f), 'utf8');
 const css = read('style.css'), body = read('body.html');
-const js = [read('engine.js'), read('i18n.js'), read('app.js')].join('\n;\n');
+const js = [read('engine.js'), read('i18n.js'), read('fx.js'), read('app.js')].join('\n;\n');
 const fonts = '<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&display=swap">';
 
 mkdirSync(join(root, 'dist'), { recursive: true });
