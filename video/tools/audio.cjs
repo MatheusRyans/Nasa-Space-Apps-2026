@@ -16,7 +16,7 @@ for (let i = 0; i < N; i++) {
   buf[i] += fade * lfo * 0.07 * (Math.sin(2 * Math.PI * 55 * t) + 0.6 * Math.sin(2 * Math.PI * 82.4 * t + 1) + 0.4 * Math.sin(2 * Math.PI * 110 * t + 2));
 }
 // whooshes
-const whooshes = [2.3, 7.85, 13.4, 18.9, 23.95, 26.75];
+const whooshes = [2.3, 7.85, 13.4, 19.7, 24.05, 26.75];
 for (const w of whooshes) {
   const len = Math.floor(SR * 0.55), start = Math.floor((w - 0.25) * SR);
   let lp = 0;
@@ -39,9 +39,10 @@ function hit(time, amp) {
 // riser into the ALERT moment
 for (let i = 0; i < SR * 1.25; i++) { const k = i / (SR * 1.25), t0 = 17.9 * SR + i; buf[Math.floor(t0)] += rnd() * 0.22 * k * k * Math.sin(2 * Math.PI * (300 + 1800 * k) * i / SR + 0); }
 hit(19.16, 0.6);
-hit(26.98, 0.55);
+hit(26.96, 0.5);
+hit(27.55, 0.42);
 // ticks while the evidence rows appear
-for (const tk of [13.9, 15.2, 16.4, 17.5, 18.4, 20.4, 22.1, 22.8]) {
+for (const tk of [2.62, 9.3, 9.9, 10.6, 11.6, 11.9, 12.2, 16.5, 17.8, 18.1, 20.9, 21.9, 22.4, 27.75, 27.95, 28.15]) {
   const start = Math.floor(tk * SR), len = Math.floor(SR * 0.05);
   for (let i = 0; i < len; i++) buf[start + i] += Math.sin(2 * Math.PI * 1400 * i / SR) * Math.exp(-i / 350) * 0.12;
 }
