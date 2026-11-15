@@ -19,8 +19,10 @@
     { id: 'A-03', name: 'R. Okafor', scn: 'high' },
     { id: 'A-04', name: 'E. Lindqvist', scn: 'healthy' }
   ];
-  const TABS = ['overview', 'checkin', 'history', 'profile'];
-  const S = { user: 1, tab: 'overview', region: 'chest', ind: 'sono', recs: [], events: [], eid: 0, clock: 30 * 1440 + 480, sim: null, result: null, errors: {}, form: {}, gateMsg: null, demoOpen: window.innerWidth > 700, anim: false, scanNext: false, fresh: false };
+  const ROLE_TABS = { astro: ['overview', 'checkin'], med: ['med', 'profile'] };
+  const TABS = ['overview', 'checkin', 'med', 'profile'];
+  const home = () => ROLE_TABS[S.role][0];
+  const S = { role: 'astro', user: 1, tab: 'overview', region: 'chest', ind: 'sono', recs: [], events: [], eid: 0, clock: 30 * 1440 + 480, sim: null, result: null, errors: {}, form: {}, gateMsg: null, demoOpen: false, anim: false, scanNext: false, fresh: false };
 
   function mkRec(i, scn) {
     const id = ROSTER[i].id, profile = E.makeProfile(id), h = E.makeHistory(id, scn, profile);
@@ -277,31 +279,93 @@
     }
     return '<div class="sep op"><h2 style="margin:0;font-size:var(--t-md)">' + esc(t('op.title')) + '</h2><p class="sub" style="margin:0">' + esc(t('op.desc')) + '</p>' + body + '</div>';
   }
-  function renderOverview(rec) {
-    const lv = rec.level, ex = explain(rec), res = rec.res, em = rec.em;
-    const done = checkedToday(rec);
-    let state = simPanel(rec);
-    const heroAct = t('lv.act.' + lv);
-    state += '<div class="hero lv' + lv + (S.fresh ? ' fresh' : '') + '"><div class="lvl">' + icon(lv) + '<span>' + esc(t('lv.' + lv)) + '</span></div><div class="msg">' + esc(headline(rec)) + '</div><div class="act">' + esc(heroAct) + '</div><div class="meta"><span>' + esc(done ? t('ov.done', { day: rec.today }) : t('ov.last', { day: res.maxDay })) + '</span><span>' + esc(t('ov.trend')) + ': ' + esc(t('trend.' + res.trend)) + '</span>' + (ex.p && lv < 3 ? '<span>' + esc(t('q.conf')) + ': ' + esc(t('conf.' + ex.p.conf)) + '</span>' : '') + '</div></div>';
-    if (!done) state += '<p class="note pending"><span>' + esc(t('ov.pending')) + '</span><button class="btn primary" data-act="tab" data-tab="checkin">' + esc(t('ov.pendingBtn')) + '</button></p>';
+  /* ---------- shared pieces for the two role views ---------- */
+  function heroHtml(rec, ex) {
+    const lv = rec.level, res = rec.res, done = checkedToday(rec);
+    return '<div class="hero lv' + lv + (S.fresh ? ' fresh' : '') + '"><div class="lvl">' + icon(lv) + '<span>' + esc(t('lv.' + lv)) + '</span></div><div class="msg">' + esc(headline(rec)) + '</div><div class="act">' + esc(t('lv.act.' + lv)) + '</div><div class="meta"><span>' + esc(done ? t('ov.done', { day: rec.today }) : t('ov.last', { day: res.maxDay })) + '</span><span>' + esc(t('ov.trend')) + ': ' + esc(t('trend.' + res.trend)) + '</span>' + (ex.p && lv < 3 ? '<span>' + esc(t('q.conf')) + ': ' + esc(t('conf.' + ex.p.conf)) + '</span>' : '') + '</div></div>';
+  }
+  function stageHtml(rec, hint) {
+    const emDone = rec.em && rec.em.stage === 'declared', dustOn = FX.src.dust() > 0.05, lv = rec.level;
+    return '<div class="stage hud' + (emDone ? ' em' : '') + '"><h2 class="hud-title"><i></i>' + esc(t('map.title')) + ' · ' + esc(rec.name) + '</h2><p class="hint">' + esc(hint) + (dustOn ? ' ' + esc(t('dust.note')) : '') + '</p><div class="holo">' + bodyMap(rec) + '<canvas class="dust" data-fx="dust" aria-hidden="true"></canvas></div>' +
+      '<div class="whole lv' + lv + '"><button data-act="region" data-r="general" aria-pressed="' + (S.region === 'general') + '">' + esc(t('reg.general')) + pill(lv) + '</button></div></div>';
+  }
+  // plain-language deviations: no sigma, no baseline numbers
+  function plainList(rec, region) {
+    const res = rec.res, out = [];
+    const inReg = k => !region || region === 'general' || E.IK[k].region === region;
+    Object.values(res.limits).forEach(l => { if (inReg(l.k)) out.push(t('astro.limit', { param: t('ind.' + l.k + '.s') })); });
+    E.INDICATORS.filter(i => res.inds[i.k].level >= 1 && !res.limits[i.k] && inReg(i.k)).sort((a, b) => res.inds[b.k].bad - res.inds[a.k].bad).slice(0, 4).forEach(I => {
+      const d = res.inds[I.k], up = d.dev >= 0;
+      out.push(t(d.persist ? (up ? 'astro.above' : 'astro.below') : (up ? 'astro.above0' : 'astro.below0'), { param: t('ind.' + I.k + '.s'), n: d.persist }));
+    });
+    return out;
+  }
+  const alertCount = rec => Object.keys(rec.res.limits).length + E.INDICATORS.filter(i => rec.res.inds[i.k].level >= 1 && !rec.res.limits[i.k]).length;
+
+  /* ---------- astronaut view: one state, one action ---------- */
+  function renderAstro(rec) {
+    const lv = rec.level, ex = explain(rec), res = rec.res, em = rec.em, done = checkedToday(rec);
+    const arrow = { worsening: '↘', stable: '→', improving: '↗' }[res.trend] || '→';
+    const n = alertCount(rec), plain = plainList(rec);
+    const emOn = !!(em && em.stage === 'declared'), acts = emOn ? t('em.actions').slice() : ex.acts.slice();
+    let main = '<p class="a-kicker">' + esc(rec.name) + ' · ' + esc(t('ov.today', { day: rec.today })) + '</p>' +
+      '<div class="a-status' + (S.fresh ? ' fresh' : '') + '">' + icon(lv) + '<span>' + esc(lv === 3 ? t('lv.s.3') : t('lv.' + lv)) + '</span></div>' +
+      '<p class="a-head">' + esc(headline(rec)) + '</p>';
+    if (em && em.stage === 'declared') main += stepsHtml(rec) + '<p><button class="btn" data-act="alertopen">' + esc(t('em.view')) + '</button> <button class="btn danger" data-act="endinc">' + esc(t('em.end')) + '</button></p>';
+    main += '<div class="a-do"><span class="a-lbl">' + esc(t(lv === 0 ? 'astro.do.0' : 'astro.do.1')) + '</span><p class="a-act">' + esc(acts[0] || t('lv.act.' + lv)) + '</p>' +
+      (!done && !emOn ? '<button class="btn primary a-btn" data-act="tab" data-tab="checkin">' + esc(t('ov.pendingBtn')) + '</button>' : '') +
+      (acts.length > 1 ? '<details class="a-more"><summary>' + esc(t('astro.next', { n: acts.length - 1 })) + '</summary><ul>' + acts.slice(1).map(a => '<li>' + esc(a) + '</li>').join('') + '</ul></details>' : '') + '</div>';
+    main += '<div class="a-stats"><div><span>' + esc(t('ov.trend')) + '</span><b>' + arrow + ' ' + esc(t('trend.' + res.trend)) + '</b></div><div><span>' + esc(t('astro.recovery')) + '</span><b>' + esc(t('astro.rec.' + lv)) + '</b></div><div><span>' + esc(t('astro.alerts')) + '</span><b class="lv' + (n ? Math.max(1, lv) : 0) + '">' + n + '</b></div></div>';
+    main += '<details class="q a-why"><summary>' + esc(t('astro.why')) + '</summary><div class="body">' + (plain.length ? '<ul>' + plain.map(p => '<li>' + esc(p) + '</li>').join('') + '</ul>' : '') + '<p>' + esc(ex.why) + '</p><p>' + esc(ex.ifnot) + '</p><p class="disc">' + esc(t('q.disc')) + '</p></div></details>';
+    main += '<details class="q"><summary>' + esc(t('op.title')) + '</summary><div class="body">' + gateHtml(rec) + '</div></details>';
+    const rp = plainList(rec, S.region), r = S.region;
+    let reg = '<h3>' + esc(t('reg.' + r)) + '</h3>';
+    if (r === 'legs') reg += '<p>' + esc(res.capacity.some(c => c.below && c.k !== 'dose') ? t('astro.cap.low') : t('astro.region.ok')) + '</p>';
+    else reg += rp.length ? '<ul>' + rp.map(p => '<li>' + esc(p) + '</li>').join('') + '</ul>' : '<p>' + esc(t('astro.region.ok')) + '</p>';
+    return '<div class="astro lv' + lv + '">' + simPanel(rec) + '<div class="a-grid"><section class="a-main" aria-label="' + esc(t('ov.title')) + '">' + main + '</section><section class="a-twin">' + stageHtml(rec, t('astro.map.hint')) + '<div class="a-region lv' + regionLevel(rec, r) + '" id="regionPanel">' + reg + '</div></section></div></div>';
+  }
+
+  /* ---------- medical team view: investigate and validate ---------- */
+  function projection(rec) {
+    const res = rec.res, tol = rec.profile.tolerances;
+    const rows = E.INDICATORS.filter(i => i.kind !== 'ord' && res.inds[i.k].dev != null && (res.inds[i.k].level >= 1 || res.watch.indexOf(i.k) >= 0)).map(I => {
+      const d = res.inds[I.k], a = Math.abs(d.dev), next = d.level >= 2 ? null : d.level === 1 ? tol.attnSigma : tol.alertSigma, nl = d.level === 1 ? 2 : 1;
+      return '<tr class="lv' + d.level + '"><td class="name">' + esc(t('ind.' + I.k + '.s')) + '</td><td>' + sgn(d.dev) + 'σ · ' + (d.persist || 0) + ' d</td><td>' + (next == null ? '—' : pill(nl) + ' ≥ ' + fmt(next, 1) + 'σ') + '</td><td>' + (next == null ? '—' : fmt(Math.max(0, next - a), 1) + 'σ') + '</td></tr>';
+    });
+    return (rows.length ? '<div class="tscroll"><table><thead><tr><th>' + esc(t('hist.indicator')) + '</th><th>' + esc(t('med.proj.now')) + '</th><th>' + esc(t('med.proj.next')) + '</th><th>' + esc(t('med.proj.gap')) + '</th></tr></thead><tbody>' + rows.join('') + '</tbody></table></div>' : '<p class="sub">' + esc(t('med.proj.none')) + '</p>') +
+      '<p class="note">' + esc(t('med.proj.rule', { enter: tol.enterDays, exit: tol.exitDays, x1: tol.exitAlertSigma })) + '</p><p class="disc">' + esc(t('med.proj.note')) + '</p>';
+  }
+  function renderMed(rec) {
+    const ex = explain(rec), res = rec.res, lv = rec.level;
+    const sec = (cls, title, body) => '<section class="m-sec hud ' + cls + '"><h2 class="hud-title"><i></i>' + esc(title) + '</h2><div class="m-body">' + body + '</div></section>';
+    const chips = '<div class="crew" role="group" aria-label="' + esc(t('med.crew')) + '">' + S.recs.map(r => '<button class="chip lv' + r.level + (r.i === S.user ? ' on' : '') + '" data-act="crew" data-i="' + r.i + '" aria-pressed="' + (r.i === S.user) + '"><b>' + esc(r.name) + '</b><span>' + r.id + '</span>' + pill(r.level, r.level === 3 ? t('lv.s.3') : null) + '</button>').join('') + '</div>';
+    let state = heroHtml(rec, ex);
     if (res.adapting) state += '<p class="note">' + esc(t('ov.adapting', { days: rec.profile.tolerances.adaptationDays })) + '</p>';
     if (res.insufficient) state += '<p class="note" role="status">' + esc(t('ov.insufficient')) + '</p>';
-    if (em && em.stage === 'declared') state += stepsHtml(rec) + '<div class="chartbox"><h3>' + esc(t('em.chart.title')) + '</h3><p class="sub">' + esc(t('em.chart.sub')) + '</p>' + emChart(em.buf, rec.profile.limits.fc.low[1]) + '</div><p><button class="btn" data-act="alertopen">' + esc(t('em.view')) + '</button> <button class="btn danger" data-act="endinc">' + esc(t('em.end')) + '</button></p>';
-    const qs = [['1', '<ul>' + ex.what.map(w => '<li>' + esc(w) + '</li>').join('') + '</ul>', true],
-      ['2', '<p>' + esc(ex.why) + '</p>' + (ex.hz.length ? '<div class="hz">' + esc(t('hz.note')) + ': ' + ex.hz.map(h => '<span class="tag">' + esc(t('hz.' + h)) + '</span>').join('') + '</div>' : ''), false],
-      ['3', '<div class="tscroll"><table><thead><tr><th>' + esc(t('q.ev.ind')) + '</th><th>' + esc(t('q.ev.base')) + '</th><th>' + esc(t('q.ev.now')) + '</th><th>' + esc(t('q.ev.dev')) + '</th><th>' + esc(t('q.ev.days')) + '</th><th>' + esc(t('q.ev.lv')) + '</th></tr></thead><tbody>' + ex.rows.join('') + '</tbody></table></div><p class="disc">' + esc(t('q.ev.note')) + '</p>', false],
-      ['4', '<p>' + esc(ex.ifnot) + '</p>', false],
-      ['5', '<ul>' + ex.acts.map(a => '<li>' + esc(a) + '</li>').join('') + '</ul><span class="urg lv' + lv + '">' + esc(ex.urg) + '</span><p class="disc">' + esc(t('q.disc')) + '</p>', true]];
-    state += '<div class="sep" style="margin-top:18px;padding-top:0;border-top:0">' + qs.map(q => '<details class="q"' + (q[2] ? ' open' : '') + '><summary>' + esc(t('q.' + q[0])) + '</summary><div class="body">' + q[1] + '</div></details>').join('') + '</div>';
-    const low = res.capacity.filter(c => c.below);
-    state += '<p class="note">' + (low.length ? esc(t('ov.capacity.low', { list: low.map(c => t('cap.' + c.k)).join(', ') })) + ' ' + esc(t('ov.capacity.action')) : esc(t('ov.capacity.ok'))) + '</p>';
-    state += gateHtml(rec);
-    state += '<details class="q" style="margin-top:14px"><summary>' + esc(t('how.title')) + '</summary><div class="body"><ol>' + [1, 2, 3, 4, 5].map(n => '<li>' + esc(t('how.' + n)) + '</li>').join('') + '</ol><p class="disc">' + esc(t('how.note')) + '</p></div></details>';
-    const emDone = rec.em && rec.em.stage === 'declared';
-    const dustOn = FX.src.dust() > 0.05;
-    const map = '<div class="stage hud' + (emDone ? ' em' : '') + '"><h2 class="hud-title"><i></i>' + esc(t('map.title')) + ' · ' + esc(rec.name) + '</h2><p class="hint">' + esc(t('map.hint')) + (dustOn ? ' ' + esc(t('dust.note')) : '') + '</p><div class="holo">' + bodyMap(rec) + '<canvas class="dust" data-fx="dust" aria-hidden="true"></canvas></div>' +
-      '<div class="whole lv' + lv + '"><button data-act="region" data-r="general" aria-pressed="' + (S.region === 'general') + '">' + esc(t('reg.general')) + pill(lv) + '</button></div></div><div class="region" id="regionPanel">' + regionPanel(rec) + '</div>';
-    return telemetryHtml(rec) + '<div class="grid"><section class="pane state-pane" aria-label="' + esc(t('ov.title')) + '"><h2>' + esc(t('ov.title')) + ' · ' + esc(t('ov.today', { day: rec.today })) + '</h2>' + state + '</section><section class="pane map-pane">' + map + '</section></div>';
+    const board = [...S.recs].sort((a, b) => b.level - a.level).map(r => '<button class="arow lv' + r.level + '" data-act="crew" data-i="' + r.i + '">' + pill(r.level, r.level === 3 ? t('lv.s.3') : null) + '<b>' + esc(r.name) + '</b><span>' + esc(headline(r)) + '</span></button>').join('');
+    const decl = S.recs.find(r => r.em && r.em.stage === 'declared');
+    let emg;
+    if (decl) emg = '<p><b>' + esc(decl.name) + '</b> · ' + esc(tstr(decl.em.t0)) + '</p>' + stepsHtml(decl) + '<div class="chartbox"><h3>' + esc(t('em.chart.title')) + '</h3><p class="sub">' + esc(t('em.chart.sub')) + '</p>' + emChart(decl.em.buf, decl.profile.limits.fc.low[1]) + '</div><p><button class="btn" data-act="alertopen">' + esc(t('em.view')) + '</button> <button class="btn danger" data-act="endinc">' + esc(t('em.end')) + '</button></p>';
+    else emg = '<p class="m-ok">' + icon(0) + esc(t('med.em.none')) + '</p><p class="note">' + esc(t('em.note')) + '</p>';
+    const expl = '<div class="m-two"><div><h3>' + esc(t('q.1')) + '</h3><ul>' + ex.what.map(w => '<li>' + esc(w) + '</li>').join('') + '</ul><h3>' + esc(t('q.2')) + '</h3><p>' + esc(ex.why) + '</p>' + (ex.hz.length ? '<div class="hz">' + esc(t('hz.note')) + ': ' + ex.hz.map(h => '<span class="tag">' + esc(t('hz.' + h)) + '</span>').join('') + '</div>' : '') + '<h3>' + esc(t('q.4')) + '</h3><p>' + esc(ex.ifnot) + '</p><h3>' + esc(t('q.5')) + '</h3><ul>' + ex.acts.map(a => '<li>' + esc(a) + '</li>').join('') + '</ul><span class="urg lv' + lv + '">' + esc(ex.urg) + '</span></div>' +
+      '<div><h3>' + esc(t('q.3')) + '</h3><div class="tscroll"><table><thead><tr><th>' + esc(t('q.ev.ind')) + '</th><th>' + esc(t('q.ev.base')) + '</th><th>' + esc(t('q.ev.now')) + '</th><th>' + esc(t('q.ev.dev')) + '</th><th>' + esc(t('q.ev.days')) + '</th><th>' + esc(t('q.ev.lv')) + '</th></tr></thead><tbody>' + ex.rows.join('') + '</tbody></table></div><p class="disc">' + esc(t('q.ev.note')) + '</p><details class="q"><summary>' + esc(t('how.title')) + '</summary><div class="body"><ol>' + [1, 2, 3, 4, 5].map(k => '<li>' + esc(t('how.' + k)) + '</li>').join('') + '</ol><p class="disc">' + esc(t('how.note')) + '</p></div></details></div></div>';
+    const I = E.IK[S.ind] || E.INDICATORS[0], d = res.inds[I.k];
+    const evo = '<div class="ctl" style="margin:0 0 10px"><label for="indsel">' + esc(t('hist.indicator')) + '</label><select id="indsel">' + E.INDICATORS.map(i => '<option value="' + i.k + '"' + (i.k === I.k ? ' selected' : '') + '>' + esc(t('ind.' + i.k)) + '</option>').join('') + '</select></div><div class="chartbox lv' + d.level + '"><h3>' + esc(t('ind.' + I.k)) + '</h3><p class="sub">' + esc(t('hist.sub')) + '</p>' + bigChart(I, rec) + '</div>';
+    const rows = E.INDICATORS.map(i => {
+      const q = res.inds[i.k];
+      return '<tr class="pick' + (i.k === I.k ? ' on' : '') + ' lv' + q.level + '" data-act="ind" data-k="' + i.k + '" tabindex="0"><td class="name">' + esc(t('ind.' + i.k + '.s')) + '</td><td>' + fmt(q.baseline.mean, i.dec) + ' ± ' + fmt(q.baseline.sd, i.dec) + '</td><td>' + (q.cur == null ? '—' : fmt(q.cur, i.dec) + esc(un(i.unit))) + '</td><td>' + (q.dev == null ? '—' : sgn(q.dev) + (i.kind === 'ord' ? '' : 'σ')) + '</td><td>' + (q.persist || '—') + '</td><td>' + pill(q.level) + '</td><td>' + spark(q.series, q.baseline, q.level) + '</td></tr>';
+    }).join('');
+    const evs = S.events.filter(e => e.who === rec.i || e.pub).sort((a, b) => b.m - a.m || b.id - a.id).slice(0, 12);
+    const hist = '<div class="m-two wide"><div><div class="tscroll"><table><thead><tr><th>' + esc(t('hist.indicator')) + '</th><th>' + esc(t('hist.col.base')) + '</th><th>' + esc(t('hist.col.now')) + '</th><th>' + esc(t('hist.col.dev')) + '</th><th>' + esc(t('hist.col.days')) + '</th><th>' + esc(t('hist.col.lv')) + '</th><th>' + esc(t('hist.col.trend')) + '</th></tr></thead><tbody>' + rows + '</tbody></table></div></div><div><h3>' + esc(t('hist.events')) + '</h3>' + (evs.length ? '<div class="tscroll"><table><tbody>' + evs.map(e => '<tr class="lv' + e.lv + '"><td>' + esc(tstr(e.m)) + '</td><td class="name">' + esc(evText(e)) + '</td></tr>').join('') + '</tbody></table></div>' : '<p class="sub">' + esc(t('hist.none')) + '</p>') + '<h3>' + esc(t('cap.title')) + '</h3><div class="tscroll"><table><tbody>' + capRows(rec) + '</tbody></table></div></div></div>';
+    const twin = '<div class="m-two"><div>' + stageHtml(rec, t('map.hint')) + '</div><div class="region" id="regionPanel">' + regionPanel(rec) + '</div></div>';
+    return chips + simPanel(rec) + '<div class="med">' +
+      sec('c7', t('med.state') + ' · ' + rec.name, state + telemetryHtml(rec)) +
+      '<div class="c5 m-stack">' + sec('', t('med.alerts'), '<div class="alist">' + board + '</div>') + sec(decl ? 'lv3 emg' : '', t('med.em'), emg) + '</div>' +
+      sec('c12', t('med.explain'), expl) +
+      sec('c7', t('med.evo'), evo) +
+      sec('c5', t('med.proj'), projection(rec)) +
+      sec('c12', t('med.hist'), hist) +
+      sec('c12', t('med.twin'), twin) + '</div>';
   }
 
   /* ---------- check-in ---------- */
@@ -338,18 +402,6 @@
       '<div class="sep"><div class="streak"><span class="big">' + n + '</span><span>' + esc(t('ci.streak.label')) + '</span><div class="badges">' + BADGES.filter(b => n >= b).map(b => '<span class="tag">' + esc(t('ci.badge', { n: b })) + '</span>').join('') + '</div></div><p class="note" style="margin-top:0">' + esc(nextB ? t('ci.streak.next', { n: nextB }) : t('ci.streak.max')) + ' ' + esc(t('ci.streak.note')) + '</p></div></section>';
   }
 
-  /* ---------- history ---------- */
-  function renderHistory(rec) {
-    const I = E.IK[S.ind] || E.INDICATORS[0], d = rec.res.inds[I.k];
-    const rows = E.INDICATORS.map(i => {
-      const q = rec.res.inds[i.k];
-      return '<tr class="pick' + (i.k === I.k ? ' on' : '') + ' lv' + q.level + '" data-act="ind" data-k="' + i.k + '" tabindex="0"><td class="name">' + esc(t('ind.' + i.k + '.s')) + '</td><td>' + fmt(q.baseline.mean, i.dec) + ' ± ' + fmt(q.baseline.sd, i.dec) + '</td><td>' + (q.cur == null ? '—' : fmt(q.cur, i.dec) + esc(un(i.unit))) + '</td><td>' + (q.dev == null ? '—' : sgn(q.dev) + (i.kind === 'ord' ? '' : 'σ')) + '</td><td>' + (q.persist || '—') + '</td><td>' + pill(q.level) + '</td><td>' + spark(q.series, q.baseline, q.level) + '</td></tr>';
-    }).join('');
-    const evs = S.events.filter(e => e.who === rec.i || e.pub).sort((a, b) => b.m - a.m || b.id - a.id).slice(0, 14);
-    return '<div class="grid"><section class="pane"><h2>' + esc(t('hist.title')) + ' · ' + esc(rec.name) + '</h2><div class="ctl" style="margin:8px 0 12px"><label for="indsel">' + esc(t('hist.indicator')) + '</label><select id="indsel" data-act-change="ind">' + E.INDICATORS.map(i => '<option value="' + i.k + '"' + (i.k === I.k ? ' selected' : '') + '>' + esc(t('ind.' + i.k)) + '</option>').join('') + '</select></div><div class="chartbox lv' + d.level + '"><h3>' + esc(t('ind.' + I.k)) + '</h3><p class="sub">' + esc(t('hist.sub')) + '</p>' + bigChart(I, rec) + '</div><div class="tscroll"><table><thead><tr><th>' + esc(t('hist.indicator')) + '</th><th>' + esc(t('hist.col.base')) + '</th><th>' + esc(t('hist.col.now')) + '</th><th>' + esc(t('hist.col.dev')) + '</th><th>' + esc(t('hist.col.days')) + '</th><th>' + esc(t('hist.col.lv')) + '</th><th>' + esc(t('hist.col.trend')) + '</th></tr></thead><tbody>' + rows + '</tbody></table></div></section>' +
-      '<section class="pane"><h2>' + esc(t('hist.events')) + '</h2>' + (evs.length ? '<div class="tscroll"><table><tbody>' + evs.map(e => '<tr class="lv' + e.lv + '"><td>' + esc(tstr(e.m)) + '</td><td class="name">' + esc(evText(e)) + '</td></tr>').join('') + '</tbody></table></div>' : '<p class="sub">' + esc(t('hist.none')) + '</p>') + '<div class="sep"><h2>' + esc(t('cap.title')) + '</h2><div class="tscroll"><table><tbody>' + capRows(rec) + '</tbody></table></div></div></section></div>';
-  }
-
   /* ---------- profile ---------- */
   function renderProfile(rec) {
     const p = rec.profile, tol = p.tolerances;
@@ -367,14 +419,17 @@
   /* ---------- shell ---------- */
   function renderTop() {
     $('#viewas').innerHTML = ROSTER.map((r, i) => '<option value="' + i + '"' + (i === S.user ? ' selected' : '') + '>' + esc(r.name) + '</option>').join('');
-    $('#lbl-view').textContent = t('view.as');
+    $('#lbl-view').textContent = t(S.role === 'med' ? 'med.crew' : 'role.astro');
     $('#lbl-lang').textContent = t('lang.label');
     $('#sub').textContent = t('app.sub');
     $('#sim').textContent = t('badge.sim');
     const fb = $('#fxbtn'); if (fb) { fb.textContent = t('fx.label') + ': ' + t(FX.enabled ? 'fx.on' : 'fx.off'); fb.setAttribute('aria-pressed', String(FX.enabled)); }
     document.documentElement.lang = lang === 'pt' ? 'pt-BR' : 'en';
     document.querySelectorAll('#lang button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.lang === lang)));
-    $('#tabs').innerHTML = TABS.map(k => '<button role="tab" id="tab-' + k + '" aria-selected="' + (S.tab === k) + '" data-act="tab" data-tab="' + k + '">' + esc(t('nav.' + k)) + '</button>').join('');
+    document.querySelectorAll('#role button').forEach(b => { b.setAttribute('aria-pressed', String(b.dataset.role === S.role)); b.textContent = t('role.' + b.dataset.role); });
+    $('#lbl-role').textContent = t('role.label');
+    document.body.dataset.role = S.role;
+    $('#tabs').innerHTML = ROLE_TABS[S.role].map(k => '<button role="tab" id="tab-' + k + '" aria-selected="' + (S.tab === k) + '" data-act="tab" data-tab="' + k + '">' + esc(t('nav.' + k)) + '</button>').join('');
     $('#foot').innerHTML = '<p>' + esc(t('foot.disc')) + '</p><span>' + esc(t('foot.sources')) + ':</span><a href="https://standards.nasa.gov/standard/nasa/nasa-std-3001" target="_blank" rel="noopener">NASA-STD-3001</a><a href="https://www.nasa.gov/hrp/hazards/" target="_blank" rel="noopener">NASA HRP</a><a href="https://www.asc-csa.gc.ca/eng/sciences/bio-monitor.asp" target="_blank" rel="noopener">CSA Bio-Monitor</a><a href="https://www.nasa.gov/directorates/esdmd/hhp/risk-of-adverse-health-performance-effects-of-celestial-dust-exposure/" target="_blank" rel="noopener">NASA dust risk</a>';
   }
   function renderDemo() {
@@ -404,7 +459,8 @@
     const rec = cur(), m = $('#main');
     m.setAttribute('role', 'tabpanel'); m.setAttribute('aria-labelledby', 'tab-' + S.tab);
     m.className = S.anim ? 'anim' : '';
-    m.innerHTML = S.tab === 'overview' ? renderOverview(rec) : S.tab === 'checkin' ? renderCheckin(rec) : S.tab === 'history' ? renderHistory(rec) : renderProfile(rec);
+    if (ROLE_TABS[S.role].indexOf(S.tab) < 0) S.tab = home();
+    m.innerHTML = S.tab === 'overview' ? renderAstro(rec) : S.tab === 'checkin' ? renderCheckin(rec) : S.tab === 'med' ? renderMed(rec) : renderProfile(rec);
     FX.countUp(m);
     applyVars();
     if (S.scanNext && document.querySelector('.stage')) { FX.scan(); S.scanNext = false; }
@@ -437,7 +493,7 @@
     sim.det = E.detectIncapacitation(sim.buf, { limits: rec.profile.limits, sleeping: rec.sleeping });
     sim.lastDet = sim.det.state;
     sim.timer = setInterval(tick, 100);
-    S.tab = 'overview'; S.scanNext = true; S.fresh = true; S.anim = true; S.demoOpen = false;
+    S.tab = home(); S.scanNext = true; S.fresh = true; S.anim = true; S.demoOpen = false;
     recompute(rec); renderDemo(); render(); window.scrollTo(0, 0);
     toast(t('toast.sim'), mode === 'faint' ? 1 : null);
   }
@@ -499,7 +555,7 @@
     rec.em.stage = 'declared'; rec.em.t0 = S.clock; rec.em.buf = S.sim ? S.sim.buf.slice(-100) : [];
     addEv(rec.i, 3, 'evt.em', {}, true); addEv(rec.i, 3, 'evt.alert', {}, true);
     recompute(rec);
-    S.user = (rec.i + 1) % ROSTER.length; S.tab = 'overview';
+    if (S.role === 'astro') S.user = (rec.i + 1) % ROSTER.length; S.tab = home();
     render(); openAlert();
   }
   function ackSim() {
@@ -549,7 +605,7 @@
     rec.res.pats.forEach(p => addEv(i, p.level, 'evt.pattern', { pattern: p.id, conf: p.conf }));
     Object.keys(rec.res.limits).forEach(k => addEv(i, 2, 'evt.limit', { ind: k }));
     S.result = null; S.form = {}; S.errors = {};
-    S.tab = 'overview'; S.anim = true; S.scanNext = true; S.fresh = true;
+    S.tab = home(); S.anim = true; S.scanNext = true; S.fresh = true;
     closeAlert(); render(); window.scrollTo(0, 0);
     toast(t('toast.scenario', { scenario: t('demo.sc.' + sc) }) + ' · ' + t('lv.' + rec.level), rec.level);
   }
@@ -558,14 +614,14 @@
     if (rec.em && rec.em.stage === 'declared') return;
     rec.today++; rec.fresh = false; S.clock = rec.today * 1440 + 480;
     addEv(rec.i, 0, 'evt.day', { day: rec.today });
-    S.result = null; S.tab = 'overview'; S.scanNext = true; S.fresh = true; S.anim = true;
+    S.result = null; S.tab = home(); S.scanNext = true; S.fresh = true; S.anim = true;
     recompute(rec); render(); window.scrollTo(0, 0);
     toast(t('toast.day', { day: rec.today }), 1);
   }
   function init() {
     stopSim();
     S.recs = ROSTER.map((r, i) => mkRec(i, r.scn));
-    S.events = []; S.eid = 0; S.clock = 30 * 1440 + 480; S.user = 1; S.tab = 'overview'; S.region = 'chest'; S.result = null; S.form = {}; S.errors = {}; S.gateMsg = null;
+    S.events = []; S.eid = 0; S.clock = 30 * 1440 + 480; S.user = 1; S.tab = home(); S.region = 'chest'; S.result = null; S.form = {}; S.errors = {}; S.gateMsg = null;
     S.recs.forEach(rec => { rec.res.pats.forEach(p => addEv(rec.i, p.level, 'evt.pattern', { pattern: p.id, conf: p.conf })); });
     closeAlert(); renderDemo(); render();
     if (FX.reduceSys && !S.noted) { S.noted = true; toast(t('toast.reduce'), null, 9000); }
@@ -576,6 +632,8 @@
     const a = el.dataset.act;
     if (a === 'tab') { S.tab = el.dataset.tab; S.gateMsg = null; S.anim = true; if (location.hash !== '#' + S.tab) { try { history.replaceState(null, '', '#' + S.tab); } catch (x) { /* ignore */ } } render(); window.scrollTo(0, 0); }
     else if (a === 'region') { S.region = el.dataset.r; render(); }
+    else if (a === 'role') { S.role = el.dataset.role; S.tab = home(); S.anim = true; S.scanNext = true; try { history.replaceState(null, '', '#' + S.tab); } catch (x) { /* ignore */ } render(); window.scrollTo(0, 0); }
+    else if (a === 'crew') { stopSim(); S.user = +el.dataset.i; S.anim = true; S.scanNext = true; render(); }
     else if (a === 'ind') { S.ind = el.dataset.k; S.anim = true; render(); }
     else if (a === 'scn') loadScenario(el.dataset.sc);
     else if (a === 'nextday') nextDay();
@@ -603,7 +661,7 @@
   });
   document.addEventListener('input', e => { const el = e.target; if (el.dataset && el.dataset.bind) S.form[el.dataset.bind] = el.value; });
   document.addEventListener('submit', e => { if (e.target.id === 'ciform') { e.preventDefault(); submitCheckin(); } });
-  window.addEventListener('hashchange', () => { const h = location.hash.replace('#', ''); if (TABS.indexOf(h) >= 0 && h !== S.tab) { S.tab = h; render(); } });
+  window.addEventListener('hashchange', () => { const h = location.hash.replace('#', ''); if (TABS.indexOf(h) >= 0 && h !== S.tab) { S.role = ROLE_TABS.med.indexOf(h) >= 0 ? 'med' : 'astro'; S.tab = h; render(); } });
 
   /* ---------- link the effects engine to the app state ---------- */
   const LVC = ['#6fe0ee', '#ecca4a', '#f79a3a', '#ff5d52'];
@@ -632,7 +690,7 @@
     document.documentElement.style.setProperty('--breath', (60 / Math.max(6, fr)).toFixed(2) + 's');
   }
 
-  const h0 = location.hash.replace('#', ''); if (TABS.indexOf(h0) >= 0) S.tab = h0;
+  const h0 = location.hash.replace('#', ''); if (TABS.indexOf(h0) >= 0) { S.role = ROLE_TABS.med.indexOf(h0) >= 0 ? 'med' : 'astro'; S.tab = h0; }
   init();
   window.AINH = { S, E, render, init };
 })();
