@@ -1,0 +1,10 @@
+{
+  "name": "aineedhealth",
+  "version": "0.2.0",
+  "private": true,
+  "description": "Crew health self-assessment prototype for NASA Space Apps 2026 (challenge: health monitoring software for astronauts).",
+  "scripts": {
+    "test": "node --test",
+    "build": "node build.mjs"
+  }
+}
