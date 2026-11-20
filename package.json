@@ -6,5 +6,13 @@
   "scripts": {
     "test": "node --test",
     "build": "node build.mjs"
+  },
+  "homepage": "https://aineedhealth.vercel.app",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/MatheusRyans/Nasa-Space-Apps-2026.git"
+  },
+  "engines": {
+    "node": ">=18"
   }
 }

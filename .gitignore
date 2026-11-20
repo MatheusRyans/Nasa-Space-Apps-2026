@@ -1,5 +1,8 @@
-﻿.claude/
+# Claude Code local settings
+.claude/
+
+# Video project: local dependencies, rendered output and local-only assets
 video/node_modules/
 video/out/
-
 video/tools/piper/
+video/public/src/
