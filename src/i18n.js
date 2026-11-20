@@ -10,7 +10,7 @@
     'badge.sim': 'Simulated data',
     'view.as': 'Viewing as',
     'lang.label': 'Language',
-    'nav.overview': 'Overview', 'nav.checkin': 'Check-in', 'nav.history': 'History', 'nav.profile': 'Medical profile',
+    'nav.overview': 'Today', 'nav.checkin': 'Check-in', 'nav.history': 'History', 'nav.profile': 'Medical profile',
 
     'demo.title': 'Demo controls',
     'demo.note': 'These controls only simulate inputs and are not part of the product.',
@@ -276,6 +276,18 @@
     'tel.spo2': 'Oxygen saturation', 'tel.resp': 'Breathing', 'tel.temp': 'Temperature',
     'tel.note': 'In the real system this comes from a wearable sensor. Here it follows your latest readings.',
     'dust.note': 'Particles show simulated dust exposure after an EVA.',
+    'role.label': 'View', 'role.astro': 'Astronaut', 'role.med': 'Medical team', 'nav.med': 'Dashboard',
+    'astro.do.0': 'KEEP GOING', 'astro.do.1': 'DO NOW', 'astro.next': 'Then: {n} more steps',
+    'astro.recovery': 'Recovery', 'astro.rec.0': 'on track', 'astro.rec.1': 'expected with rest', 'astro.rec.2': 'needs the medical team', 'astro.rec.3': 'emergency care in progress',
+    'astro.alerts': 'Active alerts', 'astro.why': 'Why am I seeing this?',
+    'astro.above': '{param} above your normal for {n} days', 'astro.below': '{param} below your normal for {n} days', 'astro.above0': '{param} above your normal', 'astro.below0': '{param} below your normal',
+    'astro.limit': '{param} outside the safety limit', 'astro.region.ok': 'Nothing unusual here.', 'astro.cap.low': 'Long-term capacity is below the requirement. Keep the exercise plan.',
+    'astro.map.hint': 'Highlighted regions need your attention. Select one to see why.',
+    'med.crew': 'Crew', 'med.state': 'Current state', 'med.alerts': 'Alerts', 'med.em': 'Emergencies', 'med.em.none': 'No active emergency.',
+    'med.explain': 'Explainability', 'med.evo': 'Temporal evolution', 'med.proj': 'Projection (rule-based)', 'med.hist': 'History', 'med.twin': 'Digital twin',
+    'med.proj.now': 'Deviation now', 'med.proj.next': 'Next level at', 'med.proj.gap': 'Distance', 'med.proj.none': 'No indicator is near a level change.',
+    'med.proj.rule': 'A level rises when the deviation stays past its threshold for {enter} days, and falls back after {exit} days below {x1}σ.',
+    'med.proj.note': 'This is a projection from the classification rules, not a statistical forecast.',
     'tab.fresh': 'fresh'
   };
 
@@ -284,7 +296,7 @@
     'badge.sim': 'Dados simulados',
     'view.as': 'Visualizando como',
     'lang.label': 'Idioma',
-    'nav.overview': 'Visão geral', 'nav.checkin': 'Check-in', 'nav.history': 'Histórico', 'nav.profile': 'Perfil médico',
+    'nav.overview': 'Hoje', 'nav.checkin': 'Check-in', 'nav.history': 'Histórico', 'nav.profile': 'Perfil médico',
 
     'demo.title': 'Controles da demonstração',
     'demo.note': 'Estes controles só simulam entradas e não fazem parte do produto.',
@@ -550,6 +562,18 @@
     'tel.spo2': 'Saturação de oxigênio', 'tel.resp': 'Respiração', 'tel.temp': 'Temperatura',
     'tel.note': 'No sistema real isto vem de um sensor vestível. Aqui acompanha as suas últimas leituras.',
     'dust.note': 'As partículas mostram a exposição simulada à poeira após uma EVA.',
+    'role.label': 'Visão', 'role.astro': 'Astronauta', 'role.med': 'Equipe médica', 'nav.med': 'Painel',
+    'astro.do.0': 'CONTINUE ASSIM', 'astro.do.1': 'FAÇA AGORA', 'astro.next': 'Depois: mais {n} passos',
+    'astro.recovery': 'Recuperação', 'astro.rec.0': 'no caminho certo', 'astro.rec.1': 'esperada com descanso', 'astro.rec.2': 'precisa da equipe médica', 'astro.rec.3': 'atendimento de emergência em curso',
+    'astro.alerts': 'Alertas ativos', 'astro.why': 'Por que estou vendo isto?',
+    'astro.above': '{param} acima do seu normal há {n} dias', 'astro.below': '{param} abaixo do seu normal há {n} dias', 'astro.above0': '{param} acima do seu normal', 'astro.below0': '{param} abaixo do seu normal',
+    'astro.limit': '{param} fora do limite de segurança', 'astro.region.ok': 'Nada fora do normal aqui.', 'astro.cap.low': 'A capacidade de longo prazo está abaixo do requisito. Mantenha o plano de exercícios.',
+    'astro.map.hint': 'As regiões em destaque pedem sua atenção. Selecione uma para ver o motivo.',
+    'med.crew': 'Tripulação', 'med.state': 'Estado atual', 'med.alerts': 'Alertas', 'med.em': 'Emergências', 'med.em.none': 'Nenhuma emergência ativa.',
+    'med.explain': 'Explicabilidade', 'med.evo': 'Evolução temporal', 'med.proj': 'Projeção (por regra)', 'med.hist': 'Histórico', 'med.twin': 'Gêmeo digital',
+    'med.proj.now': 'Desvio agora', 'med.proj.next': 'Próximo nível em', 'med.proj.gap': 'Distância', 'med.proj.none': 'Nenhum indicador está perto de mudar de nível.',
+    'med.proj.rule': 'O nível sobe quando o desvio fica além do limiar por {enter} dias, e volta após {exit} dias abaixo de {x1}σ.',
+    'med.proj.note': 'Esta é uma projeção a partir das regras de classificação, não uma previsão estatística.',
     'tab.fresh': 'atual'
   };
 

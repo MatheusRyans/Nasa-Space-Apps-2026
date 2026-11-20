@@ -1,0 +1,21 @@
+{
+  "name": "aineedhealth-video",
+  "version": "1.0.0",
+  "private": true,
+  "description": "30-second pitch video for AIneedHealth, generated with Remotion.",
+  "scripts": {
+    "narrate": "powershell -NoProfile -ExecutionPolicy Bypass -File tools/narrate.ps1",
+    "data": "node tools/data.cjs",
+    "studio": "remotion studio src/index.jsx",
+    "still": "remotion still src/index.jsx Main out/still.png --frame=300",
+    "render": "remotion render src/index.jsx Main out/aineedhealth-30s.mp4 --codec=h264 --crf=20",
+    "build": "npm run data && npm run render",
+    "audio": "node tools/audio.cjs"
+  },
+  "dependencies": {
+    "@remotion/cli": "4.0.543",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "remotion": "4.0.543"
+  }
+}
