@@ -9,7 +9,7 @@
     "studio": "remotion studio src/index.jsx",
     "still": "remotion still src/index.jsx Main out/still.png --frame=300",
     "render": "remotion render src/index.jsx Main out/aineedhealth-30s.mp4 --codec=h264 --crf=20",
-    "build": "npm run narrate && npm run data && npm run render",
+    "build": "npm run data && npm run render",
     "audio": "node tools/audio.cjs"
   },
   "dependencies": {
